@@ -32,7 +32,7 @@ router.post('/', authenticate, async (req, res) => {
   const usuario_id = req.user; // Pega o ID do usuário do middleware de autenticação
 
   try {
-    // Verificar se a sala está disponível no interval ode tempo especificado
+    // Verificar se a sala está disponível no intervalo de tempo especificado
     const conflictingReservation = await Reservation.findOne({
       sala_id,
       $or: [
@@ -49,6 +49,15 @@ router.post('/', authenticate, async (req, res) => {
     // Criando nova reserva
     const reservation = new Reservation({ usuario_id, sala_id, inicio, fim });
     await reservation.save();
+
+    // Registrar atividade de reserva criada
+    const user = await User.findById(usuario_id);
+    user.historico.push({
+      tipo: 'reserva_criada',
+      descricao:  `Reserva criada para a sala ${sala_id} de ${inicio} a ${fim}`
+    });
+    await user.save();
+
     res.status(201).json(reservation);
   } catch (err) {
     console.error(err);
@@ -69,6 +78,15 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (!canceledReservation) {
       return res.status(404).send('Reserva não encontrada');
     }
+
+    // Registrar atividade de reserva cancelada
+    const user = await User.findById(canceledReservation.usuario_id);
+    user.historico.push({
+      tipo: 'reserva cancelada',
+      descricao: `Reserva cancelada para a sala ${canceledReservation.sala_id} de ${canceledReservation.inicio} a ${canceledReservation.fim}`
+    });
+    await user.save();
+
     res.json(canceledReservation);
   } catch (err) {
     console.error(err);
@@ -87,7 +105,14 @@ router.post('/credits', authenticate, async (req, res) => {
       return res.status(404).send('Usuário não encontrado');
     }
     user.creditos += creditos;
+
+    // Registrar atividade de adição de créditos
+    user.historico.push({
+      tipo: 'credito_adicionado',
+      descricao: `Créditos adicionados: ${creditos}`
+    });
     await user.save();
+    
     res.json(user);
   } catch (err) {
     console.error(err);
